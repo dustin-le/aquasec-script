@@ -1,6 +1,6 @@
 #!/bin/bash
 # Simple shell script to generate required SSL certificates to be used with Aqua KubeEnforcer
-# Assumes yes for all user input for scripting purposes
+# Assumes yes for all user input for scripting purposes and hardcode password
 
 _banner() {
     echo
@@ -30,10 +30,10 @@ _check_k8s_connection() {
 
 _generate_ca() {
     printf "\nInfo: Generating root CA private key\n"
-    if `openssl genrsa -des3 -out rootCA.key 4096`; then
+    if `openssl genrsa -des3 -out rootCA.key -passout pass:ticketing 4096`; then
         printf "\nInfo: Successfully generated rootCA.key\n"
         printf "Info: Generating root CA certificate from root CA private key with admission_ca as common name\n"
-        if `openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 1024 -out rootCA.crt -subj "/CN=admission_ca"`; then
+        if `openssl req -x509 -new -nodes -key rootCA.key -passin pass:ticketing -sha256 -days 1024 -out rootCA.crt -subj "//CN=admission_ca"`; then
             printf "\nInfo: Successfully generated rootCA.crt\n"
             _generate_ssl
         else
@@ -66,10 +66,10 @@ _generate_ssl() {
         subjectAltName = @alt_names
 EOF
         printf "\nInfo: Generating kubeEnforcer CSR\n"
-        if `openssl req -new -sha256 -key aqua_ke.key -subj "/CN=aqua-kube-enforcer.aqua.svc" -config server.conf -out aqua_ke.csr`; then
+        if `openssl req -new -sha256 -key aqua_ke.key -subj "//CN=aqua-kube-enforcer.aqua.svc" -config server.conf -out aqua_ke.csr`; then
             printf "\nInfo: Successfully generated aqua_ke.csr\n"
             printf "\nInfo: Generating kubeEnforcer certificate\n"
-            if `openssl x509 -req -in aqua_ke.csr -CA rootCA.crt -CAkey rootCA.key -CAcreateserial -out aqua_ke.crt -days 365 -sha256 -extensions v3_req -extfile server.conf`; then
+            if `openssl x509 -req -in aqua_ke.csr -CA rootCA.crt -CAkey rootCA.key -passin pass:ticketing -CAcreateserial -out aqua_ke.crt -days 365 -sha256 -extensions v3_req -extfile server.conf`; then
                 printf "\nInfo: Successfully generated aqua_ke.crt\n"
                 _prepare_ke
             else
